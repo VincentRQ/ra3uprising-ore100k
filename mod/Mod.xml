@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AssetDeclaration xmlns="uri:ea.com:eala:asset" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<Tags></Tags>
+	<Includes>
+		<!-- Ore100K: raises every ore node's MaximumGatheredValue from 30000 to 100000 -->
+		<Include type="reference" source="DATA:static.xml" />
+		<Include type="reference" source="DATA:global.xml" />
+		<Include type="reference" source="DATA:audio.xml" />
+		<Include type="all" source="DATA:Ore100K/Data/BaseOreNode.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode2a.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode2b.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode4a.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode4b.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode4c.xml"/>
+		<Include type="all" source="DATA:Ore100K/Data/OreNode4d.xml"/>
+	</Includes>
+</AssetDeclaration>
