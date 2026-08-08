@@ -1,6 +1,6 @@
-# RA3 Uprising: Ore 100K
+# RA3 Uprising: Ore 100K + Edge Scroll
 
-Raises every ore mine's capacity and remaining ore from **30,000 to 100,000** in *Command & Conquer: Red Alert 3 – Uprising*, for every player and AI in skirmish, on all maps.
+Raises every ore mine's capacity and remaining ore from **30,000 to 100,000** in *Command & Conquer: Red Alert 3 – Uprising*, for every player and AI in skirmish, on all maps, and restores **edge scrolling** (camera pans when the cursor reaches the screen edge) that the SAGE engine only enables in exclusive fullscreen.
 
 ## How it works
 
@@ -20,9 +20,19 @@ Two delivery methods are included:
 
 Because the type templates are patched before any match starts, every ore node spawned afterwards carries the 100,000 cap and 100,000 remaining, for all players.
 
-The launcher `RA3Uprising-Ore100K.cmd` combines this with the existing borderless-fullscreen helper (alt-tab safe, no D3D9 device-loss crash).
+The launcher `RA3Uprising-Ore100K.cmd` combines this with the borderless-fullscreen helper (alt-tab safe, no D3D9 device-loss crash) and the edge-scroll tool.
 
-### 2. SDK mod (proper mod route, work in progress)
+### 3. Edge scrolling (RA3Enhance.exe, verified working)
+
+The SAGE engine only processes mouse-at-screen-edge camera panning in exclusive fullscreen. In windowed/borderless mode it never fires, so alt-tab-safe play loses edge scrolling.
+
+`RA3Enhance.exe` restores it two ways:
+1. **Cursor confinement**: while the game has focus, the cursor is clipped inside the game window (no escape to other monitors, reliable edge detection). Released automatically on alt-tab.
+2. **Virtual edge scroll**: when the cursor is within 6 pixels of any window edge, the tool holds the matching arrow key. The engine's keyboard camera pan works in windowed mode, so the camera scrolls exactly like fullscreen edge panning, diagonals included. Keys are released the moment the cursor leaves the edge zone or the game loses focus.
+
+Verified in-game: cursor at the right edge pans the camera (screenshot-verified); left edge behaves the same.
+
+### 4. SDK mod (proper mod route, work in progress)
 
 The `mod/` folder contains the RA3 MOD SDK source: `BaseOreNode.xml` (and all 7 concrete ore node types) with `MaximumGatheredValue="100000"`, plus `Mod.xml`. This compiles with `BinaryAssetBuilder.exe` + `MakeBig.exe` into `Ore100K.big`.
 
@@ -36,10 +46,12 @@ Notes on the mod route:
 | File | Purpose |
 |---|---|
 | `Ore100KPatcher.exe` | The memory patcher (self-contained, no dependencies) |
-| `RA3Uprising-Ore100K.cmd` | One-click launcher: borderless + patch |
+| `RA3Enhance.exe` | Cursor confinement + virtual edge scrolling |
+| `RA3Uprising-Ore100K.cmd` | One-click launcher: borderless + patch + edge scroll |
 | `borderless-helper.ps1` | Strips the game window's titlebar, stretches to the monitor |
 | `borderless-launcher.ps1` | Starts the helper then the game in windowed mode |
 | `src/Ore100KPatcher.cs` | Patcher source (C#, .NET Framework) |
+| `src/RA3Enhance.cs` | Edge-scroll + clip source (C#, .NET Framework) |
 | `mod/` | RA3 MOD SDK source for the proper-mod route |
 
 ## Install
