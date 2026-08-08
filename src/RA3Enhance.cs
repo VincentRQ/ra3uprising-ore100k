@@ -3,14 +3,9 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-// RA3Enhance: cursor clip + virtual edge scroll for C&C Red Alert 3: Uprising
-// 1) Confines the cursor to the game window while it is focused (enables
-//    reliable edge detection, prevents cursor escape to other monitors).
-// 2) Emulates edge scrolling: when the cursor is within EDGE_ZONE pixels of
-//    the window edge and the game is focused, holds the corresponding arrow
-//    key (keyboard camera pan works in windowed mode, unlike the engine's
-//    fullscreen-only mouse-edge path). Release on leaving the zone or on
-//    alt-tab.
+// RA3Enhance v2: cursor clip + virtual edge scroll for C&C Red Alert 3: Uprising
+// v2: focus is detected by process ID (the game process has multiple windows;
+//     handle-equality checks flap when the foreground window handle differs).
 class RA3Enhance
 {
     [DllImport("user32.dll")] static extern bool ClipCursor(ref RECT rect);
@@ -22,6 +17,7 @@ class RA3Enhance
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc cb, IntPtr lParam);
     delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder sb, int max);
     [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -47,8 +43,6 @@ class RA3Enhance
         try { System.IO.File.AppendAllText(LogPath, DateTime.Now.ToString("HH:mm:ss") + " " + msg + Environment.NewLine); } catch { }
     }
 
-    static void KeyDown(ushort vk) { Send(vk, false); }
-    static void KeyUp(ushort vk) { Send(vk, true); }
     static void Send(ushort vk, bool up)
     {
         INPUT[] inp = new INPUT[1];
@@ -61,7 +55,7 @@ class RA3Enhance
     static int Main(string[] args)
     {
         string processName = args.Length > 0 ? args[0] : "ra3ep1_1.1.game";
-        Log("=== RA3Enhance started (pid " + Process.GetCurrentProcess().Id + ") ===");
+        Log("=== RA3Enhance v2 started (pid " + Process.GetCurrentProcess().Id + ") ===");
 
         Process proc = null;
         DateTime deadline = DateTime.Now.AddSeconds(240);
@@ -75,8 +69,7 @@ class RA3Enhance
         Log("watching pid " + proc.Id);
 
         bool clipActive = false;
-        bool[] held = new bool[4]; // L U R D
-        IntPtr lastWnd = IntPtr.Zero;
+        bool[] held = new bool[4];
 
         while (true)
         {
@@ -85,28 +78,40 @@ class RA3Enhance
                 proc.Refresh();
                 if (proc.HasExited) break;
 
-                IntPtr gameWnd = IntPtr.Zero;
+                // find the main window: visible + largest area
+                IntPtr mainWnd = IntPtr.Zero;
+                long bestArea = -1;
                 EnumWindows((hWnd, lParam) =>
                 {
                     uint wpid;
                     GetWindowThreadProcessId(hWnd, out wpid);
-                    if (wpid == (uint)proc.Id && IsWindowVisible(hWnd)) { gameWnd = hWnd; return false; }
+                    if (wpid == (uint)proc.Id && IsWindowVisible(hWnd))
+                    {
+                        RECT r;
+                        if (GetWindowRect(hWnd, out r))
+                        {
+                            long area = (long)(r.Right - r.Left) * (r.Bottom - r.Top);
+                            if (area > bestArea) { bestArea = area; mainWnd = hWnd; }
+                        }
+                    }
                     return true;
                 }, IntPtr.Zero);
 
-                bool focused = gameWnd != IntPtr.Zero && GetForegroundWindow() == gameWnd;
+                // focus by process id, not handle
+                IntPtr fg = GetForegroundWindow();
+                uint fgPid = 0;
+                GetWindowThreadProcessId(fg, out fgPid);
+                bool focused = fgPid == (uint)proc.Id;
 
-                if (focused)
+                if (focused && mainWnd != IntPtr.Zero)
                 {
                     RECT r;
-                    if (GetWindowRect(gameWnd, out r))
+                    if (GetWindowRect(mainWnd, out r))
                     {
-                        if (!clipActive) Log("clip ON at " + r.Left + "," + r.Top + " " + r.Right + "x" + r.Bottom);
+                        if (!clipActive) Log("clip ON at " + r.Left + "," + r.Top + " " + r.Right + "x" + r.Bottom + " (fg pid " + fgPid + ")");
                         ClipCursor(ref r);
                         clipActive = true;
-                        lastWnd = gameWnd;
 
-                        // virtual edge scroll
                         POINT pt;
                         GetCursorPos(out pt);
                         bool[] want = new bool[4];
@@ -118,23 +123,23 @@ class RA3Enhance
                         ushort[] vks = { VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN };
                         for (int i = 0; i < 4; i++)
                         {
-                            if (want[i] && !held[i]) { KeyDown(vks[i]); held[i] = true; }
-                            else if (!want[i] && held[i]) { KeyUp(vks[i]); held[i] = false; }
+                            if (want[i] && !held[i]) { Send(vks[i], false); held[i] = true; Log("key " + vks[i] + " down"); }
+                            else if (!want[i] && held[i]) { Send(vks[i], true); held[i] = false; Log("key " + vks[i] + " up"); }
                         }
                     }
                 }
                 else
                 {
-                    if (clipActive) { ClipCursor(IntPtr.Zero); clipActive = false; Log("clip OFF"); }
+                    if (clipActive) { ClipCursor(IntPtr.Zero); clipActive = false; Log("clip OFF (fg pid " + fgPid + ")"); }
                     for (int i = 0; i < 4; i++)
-                        if (held[i]) { KeyUp(new ushort[] { VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN }[i]); held[i] = false; }
+                        if (held[i]) { Send(new ushort[] { VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN }[i], true); held[i] = false; }
                 }
             }
             catch { }
             Thread.Sleep(30);
         }
         ClipCursor(IntPtr.Zero);
-        for (int i = 0; i < 4; i++) if (held[i]) KeyUp(new ushort[] { VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN }[i]);
+        for (int i = 0; i < 4; i++) if (held[i]) Send(new ushort[] { VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN }[i], true);
         Log("=== game exited ===");
         return 0;
     }
