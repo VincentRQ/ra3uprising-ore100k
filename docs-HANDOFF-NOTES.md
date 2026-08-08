@@ -1,5 +1,5 @@
 # RA3 / Uprising Fix Session - Handoff Notes
-Last updated: 2026-08-07 (session 2 - Ore100K finished)
+Last updated: 2026-08-07 (session 2 - Ore100K finished + edge scroll)
 
 ## GOAL STATUS
 
@@ -9,6 +9,7 @@ Last updated: 2026-08-07 (session 2 - Ore100K finished)
 | CTD fixes | ✅ DONE - CP re-activated + RUNASADMIN removed |
 | Borderless fullscreen | ✅ DONE - launcher scripts work |
 | **Ore mine cap 30k -> 100k** | ✅ DONE - `Ore100KPatcher.exe` auto-patcher, verified SUCCESS |
+| **Edge scrolling in borderless mode** | ✅ DONE - `RA3Enhance.exe` virtual edge scroll, screenshot-verified |
 | SDK mod route (proper mod) | 🔶 WIP - big loads but asset override does not take effect |
 
 ---
@@ -67,7 +68,43 @@ scripts in the session temp area.
   the patcher was rebuilt as a single .exe to sidestep script/DLL locks.
 - MEGAsync sync also locks freshly created files in Default Project briefly.
 
-## 3. SESSION-1 NOTES (kept for reference)
+## 3. EDGE SCROLLING IN BORDERLESS MODE (COMPLETE - this session)
+
+### The problem
+- SAGE engine only processes mouse-at-screen-edge camera panning in
+  exclusive fullscreen. In windowed/borderless (-win) mode it never fires
+  (verified: cursor pinned at the screen edge, game focused, clip active,
+  zero camera movement over 4 s).
+- Keyboard panning (arrow keys) DOES work in windowed mode (engine input
+  path, not gated on fullscreen).
+
+### The fix: RA3Enhance.exe
+- Cursor confinement: while the game has focus, ClipCursor keeps the cursor
+  inside the game window (no escape to other monitors; the clip releases
+  automatically when the game loses focus - verified in the log).
+- Virtual edge scroll: cursor within 6 px of a window edge + game focused =>
+  hold the matching arrow key (VK_LEFT/RIGHT/UP/DOWN, diagonals included);
+  release when the cursor leaves the zone or focus is lost.
+- Verified in-game by screenshot diff: cursor at the right edge pans the
+  camera (29.4 mean diff vs ~6-11 ambient), left edge pans too.
+- EDGE_ZONE = 6 px constant at the top of RA3Enhance.cs if tuning is wanted.
+- Log: %TEMP%\ra3-enhance.log (clip on/off transitions).
+
+### Launcher now does
+borderless helper + Ore100KPatcher + RA3Enhance + game -win, in one cmd:
+`RA3Uprising-Ore100K.cmd` in Default Project.
+
+### Session notes / pitfalls (edge scroll work)
+- The game window must be FOCUSED for any input (mouse or keys) to register.
+  Something in this environment stole focus every few seconds (log shows
+  clip ON/OFF flaps) - verify focus via the clip log before judging input.
+- An unattended skirmish with AI ends in defeat; a defeated match has a
+  locked camera and makes pan tests look broken. Always test in a live match.
+- The map intro cinematic locks camera + input for ~30-60 s at match start.
+- Alt+Enter toggles real fullscreen (works, but reintroduces the alt-tab
+  crash risk; not used by the launcher).
+
+## 4. SESSION-1 NOTES (kept for reference)
 
 ### Crash fixes (complete)
 - Both games crash on alt-tab due to D3D9 exclusive-fullscreen device loss.
