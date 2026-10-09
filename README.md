@@ -1,88 +1,82 @@
-# RA3 Uprising: Ore 100K + Edge Scroll
+# RA3 Auto Enhance — persistent Uprising 100K ore fix
 
-Raises every ore mine's capacity and remaining ore from **30,000 to 100,000** in *Command & Conquer: Red Alert 3 â€“ Uprising*, for every player and AI in skirmish, on all maps, and restores **edge scrolling** (camera pans when the cursor reaches the screen edge) that the SAGE engine only enables in exclusive fullscreen.
-
-## How it works
-
-The ore node capacity (`MaximumGatheredValue`) is data-driven: it lives in `BaseOreNode.xml` and is compiled into the game's binary assets. When a match starts, every ore node instance is seeded from that value.
-
-Two delivery methods are included:
-
-### 1. Live patcher (recommended, verified working)
-
-`Ore100KPatcher.exe` is a small console tool that:
-
-1. Waits for the game process (`ra3ep1_1.1.game`).
-2. Waits ~25 seconds for the game's data to load (templates exist by then).
-3. Scans the process memory for every value equal to 30,000 (the ore node cap, stored as int and float).
-4. Rewrites those values to 100,000.
-5. Verifies zero 30,000 values remain and logs the result to `%TEMP%\ore100k-patcher.log`.
-
-Because the type templates are patched before any match starts, every ore node spawned afterwards carries the 100,000 cap and 100,000 remaining, for all players.
-
-The launcher `RA3Uprising-Ore100K.cmd` combines this with the borderless-fullscreen helper (alt-tab safe, no D3D9 device-loss crash) and the edge-scroll tool.
-
-### 3. Edge scrolling (RA3Enhance.exe, verified working)
-
-The SAGE engine only processes mouse-at-screen-edge camera panning in exclusive fullscreen. In windowed/borderless mode it never fires, so alt-tab-safe play loses edge scrolling.
-
-`RA3Enhance.exe` restores it two ways:
-1. **Cursor confinement**: while the game has focus, the cursor is clipped inside the game window (no escape to other monitors, reliable edge detection). Released automatically on alt-tab.
-2. **Virtual edge scroll**: when the cursor is within 6 pixels of any window edge, the tool holds the matching arrow key. The engine's keyboard camera pan works in windowed mode, so the camera scrolls exactly like fullscreen edge panning, diagonals included. Keys are released the moment the cursor leaves the edge zone or the game loses focus.
-
-Verified in-game: cursor at the right edge pans the camera (screenshot-verified); left edge behaves the same.
-
-### 4. SDK mod (proper mod route, work in progress)
-
-The `mod/` folder contains the RA3 MOD SDK source: `BaseOreNode.xml` (and all 7 concrete ore node types) with `MaximumGatheredValue="100000"`, plus `Mod.xml`. This compiles with `BinaryAssetBuilder.exe` + `MakeBig.exe` into `Ore100K.big`.
-
-Notes on the mod route:
-- The compiled big loads (verified: its file list and manifest appear in the game's memory), but the asset override did not take effect in testing, via either `add-big` in the game's `.SkuDef` or a `-modConfig` skudef. The engine appears to keep using the original compiled ore node assets.
-- Root cause is suspected to be an asset version/ID mismatch between SDK-compiled assets and the shipped game data. Solving it requires reverse-engineering the big/manifest format further.
-- Until then, the live patcher is the reliable path. It produces the same in-game result: mines read `100,000 / 100,000`.
-
-## Files
-
-| File | Purpose |
-|---|---|
-| `Ore100KPatcher.exe` | The memory patcher (self-contained, no dependencies) |
-| `RA3Enhance.exe` | Cursor confinement + virtual edge scrolling |
-| `RA3Uprising-Ore100K.cmd` | One-click launcher: borderless + patch + edge scroll |
-| `borderless-helper.ps1` | Strips the game window's titlebar, stretches to the monitor |
-| `borderless-launcher.ps1` | Starts the helper then the game in windowed mode |
-| `src/Ore100KPatcher.cs` | Patcher source (C#, .NET Framework) |
-| `src/RA3Enhance.cs` | Edge-scroll + clip source (C#, .NET Framework) |
-| `mod/` | RA3 MOD SDK source for the proper-mod route |
+Install once, then launch Red Alert 3 or Uprising normally from Steam. Includes borderless fullscreen, edge scrolling and Steam `-win` options. **Uprising 1.1 ore mines start at 100,000 for every player and AI.**
 
 ## Install
 
-1. Copy the whole folder somewhere stable (e.g. `%LOCALAPPDATA%\RA3Ore100K\`).
-2. Edit `RA3Uprising-Ore100K.cmd` if your game is not installed at
-   `D:\SteamLibrary\steamapps\common\Command and Conquer Red Alert 3 Uprising\`.
-3. Double-click `RA3Uprising-Ore100K.cmd` instead of launching from Steam.
+1. Download the latest ZIP and SHA-256 file from [Releases](https://github.com/VincentRQ/ra3uprising-ore100k/releases).
+2. Extract the ZIP completely and close Uprising.
+3. Run `Install.cmd`. The installer locates Uprising through Steam and builds the override from your own retail files. No SDK installation or Python is needed for the packaged installer.
+4. Restart Steam once to load its updated launch options, then use the normal Steam Play button.
 
-Steam's Play button still launches the unpatched game (30k mines). Always use the launcher.
+Runtime executables are installed under `%USERPROFILE%\.local\share\ra3-auto-enhance`. One current-user scheduled task, `RA3 Auto Enhance`, starts the supervisor and four background helpers at sign-in. Setup and refill tools run only when requested. Updating from the old installer stops its recognised supervisor and helpers before starting the new bundle.
 
-## Requirements
+If Uprising is outside the detected Steam libraries, run this from a terminal in the installed runtime folder:
 
-- Windows 10/11, .NET Framework 4.x (included with Windows)
-- Steam version of *Red Alert 3: Uprising* (the game's `.game` process is the 32-bit `ra3ep1_1.1.game`)
-- Run the game with `-win` (the launcher does this). Do not run exclusive fullscreen; alt-tab in that mode crashes the SAGE engine.
+```powershell
+.\RA3OreSetup.exe --install --game-dir "D:\SteamLibrary\steamapps\common\Command and Conquer Red Alert 3 Uprising"
+```
 
-## Notes
+Use the actual installation folder on your computer. Setup supports the English retail Uprising 1.1 configuration and the verified native OreNode asset. It refuses unknown asset versions instead of guessing.
 
-- The patch is applied to the running game's memory only. It does not modify any game files. A fresh launch via the launcher re-applies it automatically.
-- Do not run Steam's "Play" for this game while the launcher is also running the game; two instances will fight over the same settings.
-- If your antivirus quarantines `Ore100KPatcher.exe` (it is an unsigned, freshly compiled tool), add an exclusion for the folder. A signature-free exe of this kind sometimes trips scanners.
-- Some antivirus products in "disinfection" mode can block the patcher's memory reads; wait for the scan to finish before launching.
+## Why the 30K fix used to fail
 
-## Verify
+The old helper edited an ore template after the engine loaded it. A match or old save could already have created its own 30,000-ore instances. A successful template-write log therefore did not prove that a mine had changed.
 
-Launch the game via the cmd, start any skirmish, click any ore mine. It reads `100,000 / 100,000`.
+Version 1.1 builds a **retail-native startup override**. It changes only the named OreNode capacity and required identity/checksum metadata, retaining the original retail streams. The override is registered before the stock stream in the game's `.SkuDef`, so fresh mines are created with 100,000 ore. Uprising no longer relies on late memory-template scans.
 
-The patcher also writes `%TEMP%\ore100k-patcher.log` with a `RESULT: SUCCESS` line when the patch completed cleanly.
+The background guard verifies the generated file and repairs a missing registration after Steam file verification, when the game is closed. It preserves other mod entries. Local override data, receipts and configuration backups are kept under `%USERPROFILE%\.local\share\ra3-uprising-ore100k`.
 
-## Known limits
+This is persistent across ordinary restarts and registration resets. If the generated override is deleted or corrupted, or the retail game version changes, setup needs repair; the helper logs the failure. It does not silently fall back to the old Uprising patcher.
 
-- The value is per-process: if the game is restarted, the launcher must run again (it does, automatically).
-- The cap applies to ore nodes (the mines on the map). The ore *refinery*'s internal storage buffer is a separate engine constant and was out of scope for this pass.
+## Older saved games
+
+Old saves retain their own initial and depleted ore counters. The startup fix does not refill an existing match automatically.
+
+Load the desired save and run the one-time inspection from the installed runtime folder:
+
+```powershell
+.\RA3OreRefill.exe --inspect
+```
+
+Count the identified mines, then supply that count explicitly. For the tested 24-mine map:
+
+```powershell
+.\RA3OreRefill.exe --apply --expected-mines 24
+```
+
+The tool validates the retail engine routines, the running executable path, OreNode module and owner identities, and each owner's module membership. It backs up original Uprising saves and records the previous counters before briefly suspending the engine for the writes. It sets starting ore to 100,000, clears mined ore, verifies the result and resumes the match. It never replaces arbitrary occurrences of 30,000.
+
+**Save the match in-game after refilling.** That saves the new counters for later loading. Harvesting continues to reduce the remaining amount normally. The refill tool does not edit save files directly and does not keep refilling mines in the background. Use `--game-dir` or `--saves-dir` if discovery or the standard Saved Games location does not match your installation.
+
+## Check and recover
+
+From the installed runtime folder:
+
+```powershell
+.\RA3OreSetup.exe --check
+Get-ScheduledTask -TaskName 'RA3 Auto Enhance'
+Get-Content "$env:LOCALAPPDATA\RA3AutoEnhance\ore100k.log" -Tail 20
+```
+
+After setup, start a **new skirmish** and select a mine: starting ore should be 100,000 and remaining ore should begin at 100,000 before harvesting. Old saves require the separate refill above. A refinery's internal storage buffer is outside this fix's scope.
+
+Use `Uninstall.cmd` or the Start-menu uninstaller to remove the helpers and their scheduled task. Close Uprising first. Uninstall removes only this override's registration and installer-owned Steam options; local override files and backups are retained for recovery.
+
+## Build and verification
+
+Windows 10/11, Python 3.11+ and PowerShell 5.1+:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\tools\Build-Release.ps1 -Version 1.1.0 -Python .\.venv\Scripts\python.exe
+```
+
+The build runs unit tests, packages seven executables, runs their self-tests, checks supervisor cleanup and verifies staged installation/uninstallation before producing a ZIP and SHA-256 file. Retail assets are built on the owner's machine and are excluded from GitHub and release packages.
+
+See [the verification record](docs/ORE-FIX-VERIFICATION.md), [LLM-GUIDE.md](LLM-GUIDE.md), and [SECURITY.md](SECURITY.md). Base Red Alert 3 retains the exact-signature memory-template patch; the persistent retail override and old-save refill described here target Uprising 1.1.
+
+## Licence
+
+[MIT](LICENSE) for this project's code. Command & Conquer and Red Alert 3 belong to their respective owners. Independent fan project, not affiliated with Electronic Arts or Valve. Never disable antivirus globally to install it; compare release hashes or build the source yourself.
