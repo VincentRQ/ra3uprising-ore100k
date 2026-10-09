@@ -90,9 +90,10 @@ Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'Install.cmd') -Destination $P
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'Uninstall.cmd') -Destination $PackageRoot
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'installer\Install-RA3AutoEnhance.ps1') -Destination (Join-Path $PackageRoot 'installer')
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'installer\Uninstall-RA3AutoEnhance.ps1') -Destination (Join-Path $PackageRoot 'installer')
-foreach ($document in @('README.md','LLM-GUIDE.md','LICENSE','THIRD-PARTY-NOTICES.md')) {
+foreach ($document in @('README.md','LLM-GUIDE.md','SECURITY.md','LICENSE','THIRD-PARTY-NOTICES.md')) {
     Copy-Item -LiteralPath (Join-Path $RepositoryRoot $document) -Destination $PackageRoot
 }
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'docs') -Destination (Join-Path $PackageRoot 'docs') -Recurse
 $pythonBase = (& $Python -c "import sys; print(sys.base_prefix)").Trim()
 $pyInstallerLicense = (& $Python -c "import importlib.metadata as m, pathlib; d=m.distribution('pyinstaller'); print(next(pathlib.Path(d.locate_file(f)) for f in d.files if f.name == 'COPYING.txt'))").Trim()
 Copy-Item -LiteralPath (Join-Path $pythonBase 'LICENSE.txt') -Destination (Join-Path $PackageRoot 'licenses\PYTHON-LICENSE.txt')

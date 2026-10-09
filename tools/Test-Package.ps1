@@ -10,6 +10,8 @@ $required = @(
     'Uninstall.cmd',
     'README.md',
     'LLM-GUIDE.md',
+    'SECURITY.md',
+    'docs\ORE-FIX-VERIFICATION.md',
     'LICENSE',
     'THIRD-PARTY-NOTICES.md',
     'licenses\PYTHON-LICENSE.txt',
@@ -39,7 +41,7 @@ try {
             throw "Installer did not copy $name"
         }
     }
-    foreach ($license in @('licenses\PYTHON-LICENSE.txt','licenses\PYINSTALLER-LICENSE.txt')) {
+    foreach ($license in @('licenses\PYTHON-LICENSE.txt','licenses\PYINSTALLER-LICENSE.txt','SECURITY.md','docs\ORE-FIX-VERIFICATION.md')) {
         if (-not (Test-Path -LiteralPath (Join-Path $testRoot $license))) {
             throw "Installer did not copy $license"
         }

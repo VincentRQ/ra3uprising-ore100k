@@ -114,9 +114,10 @@ foreach ($name in $RequiredExecutables) {
 New-Item -ItemType Directory -Path (Join-Path $InstallRoot 'installer') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $PackageRoot 'installer\Uninstall-RA3AutoEnhance.ps1') -Destination (Join-Path $InstallRoot 'installer\Uninstall-RA3AutoEnhance.ps1') -Force
 Copy-Item -LiteralPath (Join-Path $PackageRoot 'Uninstall.cmd') -Destination (Join-Path $InstallRoot 'Uninstall.cmd') -Force
-foreach ($document in @('README.md','LLM-GUIDE.md','LICENSE','THIRD-PARTY-NOTICES.md')) {
+foreach ($document in @('README.md','LLM-GUIDE.md','SECURITY.md','LICENSE','THIRD-PARTY-NOTICES.md')) {
     Copy-Item -LiteralPath (Join-Path $PackageRoot $document) -Destination (Join-Path $InstallRoot $document) -Force
 }
+Copy-Item -LiteralPath (Join-Path $PackageRoot 'docs') -Destination (Join-Path $InstallRoot 'docs') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PackageRoot 'licenses') -Destination (Join-Path $InstallRoot 'licenses') -Recurse -Force
 
 $marker = @{
