@@ -1,120 +1,82 @@
-# RA3 Auto Enhance
+# RA3 Auto Enhance � persistent Uprising 100K ore fix
 
-No-admin Windows enhancements for the Steam versions of:
-
-- *Command & Conquer: Red Alert 3* (including the Community Patch executable)
-- *Command & Conquer: Red Alert 3 – Uprising*
-
-Install once, then launch either game normally from Steam. RA3 Auto Enhance supplies:
-
-- **100K ore mines** — raises the ore-node cap from 30,000 to 100,000 for every player and AI.
-- **Borderless fullscreen** — keeps the game internally windowed for safer Alt+Tab behavior, removes the frame, and fills the active monitor.
-- **Working edge scrolling** — restores mouse-at-edge camera movement in borderless mode, including diagonals.
-- **Steam Play-button support** — safely persists `-win` for Steam app IDs `17480` and `24800`.
-- **No flashing helper windows** — the installed runtime uses Windows GUI-subsystem executables and native process enumeration; it does not loop through `tasklist.exe` or `cmd.exe`.
+Install once, then launch Red Alert 3 or Uprising normally from Steam. Includes borderless fullscreen, edge scrolling and Steam `-win` options. **Uprising 1.1 ore mines start at 100,000 for every player and AI.**
 
 ## Install
 
-1. Open the repository's [Releases](https://github.com/VincentRQ/ra3uprising-ore100k/releases) page.
-2. Download the newest `RA3-Auto-Enhance-<version>.zip` and its `.sha256` file.
-3. Extract the ZIP completely.
-4. Double-click `Install.cmd`.
-5. Allow the installer to restart Steam once, or exit Steam manually for at least five seconds and reopen it.
-6. Launch either game normally from the Steam Library.
+1. Download the latest ZIP and SHA-256 file from [Releases](https://github.com/VincentRQ/ra3uprising-ore100k/releases).
+2. Extract the ZIP completely and close Uprising.
+3. Run `Install.cmd`. The installer locates Uprising through Steam and builds the override from your own retail files. No SDK installation or Python is needed for the packaged installer.
+4. Restart Steam once to load its updated launch options, then use the normal Steam Play button.
 
-The installer does not need administrator rights. It installs to:
+Runtime executables are installed under `%USERPROFILE%\.local\share\ra3-auto-enhance`. One current-user scheduled task, `RA3 Auto Enhance`, starts the supervisor and four background helpers at sign-in. Setup and refill tools run only when requested. Updating from the old installer stops its recognised supervisor and helpers before starting the new bundle.
 
-```text
-%LOCALAPPDATA%\RA3AutoEnhance
-```
-
-It registers one current-user scheduled task named `RA3 Auto Enhance`. That task starts one hidden supervisor at sign-in; the supervisor starts four hidden helpers for borderless mode, edge scrolling, ore patching, and Steam launch options.
-
-## Uninstall
-
-Use **Uninstall RA3 Auto Enhance** from the Start menu, or run `Uninstall.cmd` from the extracted release folder.
-
-The uninstaller removes the scheduled task, installed files, and only the `-win` launch-option tokens that this installer recorded as its own. If Steam is open, it asks before closing it.
-
-## What it changes
-
-RA3 Auto Enhance does **not** replace or edit game files.
-
-At runtime it:
-
-1. Detects `ra3_1.13.game`, `RA3_1.12.game`, or `ra3ep1_1.1.game` with the Windows Toolhelp API.
-2. Removes standard window frame styles and applies a four-pixel monitor overscan.
-3. Clips the cursor only while the game owns foreground focus and sends DirectInput-compatible arrow scan codes at monitor edges.
-4. Finds the exact ore behavior signature `{30000, 250, 60}` in the running process and changes only its first value to `100000`.
-5. Adds `-win` to the two Steam app records while Steam is not writing `localconfig.vdf`. A backup is created beside that file before the first change.
-
-## Security and antivirus notice
-
-The ore feature must call Windows process-memory APIs (`OpenProcess`, `ReadProcessMemory`, and `WriteProcessMemory`). Unsigned tools that do this can trigger antivirus or reputation warnings even when their source is public.
-
-- Download releases only from this repository.
-- Compare the ZIP's SHA-256 hash with the published `.sha256` file.
-- Do not disable antivirus globally or add broad folder exclusions.
-- If you prefer, inspect the source and build the executables locally.
-
-See [SECURITY.md](SECURITY.md) for the exact trust boundary and reporting guidance.
-
-## Logs and troubleshooting
-
-Runtime logs and installer-owned state live in:
-
-```text
-%LOCALAPPDATA%\RA3AutoEnhance
-```
-
-Useful files:
-
-| File | Meaning |
-|---|---|
-| `supervisor.log` | Helper starts, stops, and restart backoff |
-| `borderless.log` | Window detection and geometry application |
-| `edge-scroll.log` | Game attachment, cursor clipping, and arrow press/release events |
-| `ore100k.log` | Game attachment and the exact patched address |
-| `steam-options.log` | Steam config discovery, backup, add, and removal operations |
-| `state.json` | Records which Steam options the installer owns |
-
-Quick checks:
+If Uprising is outside the detected Steam libraries, run this from a terminal in the installed runtime folder:
 
 ```powershell
-Get-ScheduledTask -TaskName 'RA3 Auto Enhance'
-Get-Content "$env:LOCALAPPDATA\RA3AutoEnhance\supervisor.log" -Tail 20
-Get-Content "$env:LOCALAPPDATA\RA3AutoEnhance\ore100k.log" -Tail 20
-Get-Content "$env:LOCALAPPDATA\RA3AutoEnhance\edge-scroll.log" -Tail 20
+.\RA3OreSetup.exe --install --game-dir "D:\SteamLibrary\steamapps\common\Command and Conquer Red Alert 3 Uprising"
 ```
 
-If Steam Play launches exclusive fullscreen, exit Steam completely, wait five seconds, and reopen it. The helper never edits `localconfig.vdf` while `steam.exe` is running.
+Use the actual installation folder on your computer. Setup supports the English retail Uprising 1.1 configuration and the verified native OreNode asset. It refuses unknown asset versions instead of guessing.
 
-For AI-assisted setup or diagnosis, open [LLM-GUIDE.md](LLM-GUIDE.md) and give it to the assistant.
+## Why the 30K fix used to fail
 
-## Build from source
+The old helper edited an ore template after the engine loaded it. A match or old save could already have created its own 30,000-ore instances. A successful template-write log therefore did not prove that a mine had changed.
 
-Requirements:
+Version 1.1 builds a **retail-native startup override**. It changes only the named OreNode capacity and required identity/checksum metadata, retaining the original retail streams. The override is registered before the stock stream in the game's `.SkuDef`, so fresh mines are created with 100,000 ore. Uprising no longer relies on late memory-template scans.
 
-- Windows 10 or 11
-- Python 3.11+
-- PowerShell 5.1+
+The background guard verifies the generated file and repairs a missing registration after Steam file verification, when the game is closed. It preserves other mod entries. Local override data, receipts and configuration backups are kept under `%USERPROFILE%\.local\share\ra3-uprising-ore100k`.
+
+This is persistent across ordinary restarts and registration resets. If the generated override is deleted or corrupted, or the retail game version changes, setup needs repair; the helper logs the failure. It does not silently fall back to the old Uprising patcher.
+
+## Older saved games
+
+Old saves retain their own initial and depleted ore counters. The startup fix does not refill an existing match automatically.
+
+Load the desired save and run the one-time inspection from the installed runtime folder:
+
+```powershell
+.\RA3OreRefill.exe --inspect
+```
+
+Count the identified mines, then supply that count explicitly. For the tested 24-mine map:
+
+```powershell
+.\RA3OreRefill.exe --apply --expected-mines 24
+```
+
+The tool validates the retail engine routines, the running executable path, OreNode module and owner identities, and each owner's module membership. It backs up original Uprising saves and records the previous counters before briefly suspending the engine for the writes. It sets starting ore to 100,000, clears mined ore, verifies the result and resumes the match. It never replaces arbitrary occurrences of 30,000.
+
+**Save the match in-game after refilling.** That saves the new counters for later loading. Harvesting continues to reduce the remaining amount normally. The refill tool does not edit save files directly and does not keep refilling mines in the background. Use `--game-dir` or `--saves-dir` if discovery or the standard Saved Games location does not match your installation.
+
+## Check and recover
+
+From the installed runtime folder:
+
+```powershell
+.\RA3OreSetup.exe --check
+Get-ScheduledTask -TaskName 'RA3 Auto Enhance'
+Get-Content "$env:LOCALAPPDATA\RA3AutoEnhance\ore100k.log" -Tail 20
+```
+
+After setup, start a **new skirmish** and select a mine: starting ore should be 100,000 and remaining ore should begin at 100,000 before harvesting. Old saves require the separate refill above. A refinery's internal storage buffer is outside this fix's scope.
+
+Use `Uninstall.cmd` or the Start-menu uninstaller to remove the helpers and their scheduled task. Close Uprising first. Uninstall removes only this override's registration and installer-owned Steam options; local override files and backups are retained for recovery.
+
+## Build and verification
+
+Windows 10/11, Python 3.11+ and PowerShell 5.1+:
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
-.\tools\Build-Release.ps1 -Version 1.0.0 -Python .\.venv\Scripts\python.exe
+.\tools\Build-Release.ps1 -Version 1.1.0 -Python .\.venv\Scripts\python.exe
 ```
 
-The build runs unit tests, creates five windowless executables with PyInstaller, runs each executable's self-test, performs a clean staging install/uninstall, then creates a ZIP and SHA-256 file under `artifacts\`.
+The build runs unit tests, packages seven executables, runs their self-tests, checks supervisor cleanup and verifies staged installation/uninstallation before producing a ZIP and SHA-256 file. Retail assets are built on the owner's machine and are excluded from GitHub and release packages.
 
-## Supported scope
+See [the verification record](docs/ORE-FIX-VERIFICATION.md), [LLM-GUIDE.md](LLM-GUIDE.md), and [SECURITY.md](SECURITY.md). Base Red Alert 3 retains the exact-signature memory-template patch; the persistent retail override and old-save refill described here target Uprising 1.1.
 
-- Steam releases on Windows 10/11.
-- Base RA3 process names: `ra3_1.13.game` and `RA3_1.12.game`.
-- Uprising process name: `ra3ep1_1.1.game`.
-- The ore cap applies to map ore nodes. A refinery's separate internal buffer is outside this project's scope.
-- The exact live patcher is the verified ore path; no game assets or SDK files are distributed.
+## Licence
 
-## License
-
-Code in this repository is released under the [MIT License](LICENSE). *Command & Conquer*, *Red Alert 3*, and related names are trademarks of their respective owners. This is an independent fan project and is not affiliated with or endorsed by Electronic Arts or Valve.
+[MIT](LICENSE) for this project's code. Command & Conquer and Red Alert 3 belong to their respective owners. Independent fan project, not affiliated with Electronic Arts or Valve. Never disable antivirus globally to install it; compare release hashes or build the source yourself.

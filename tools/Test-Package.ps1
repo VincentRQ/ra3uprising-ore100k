@@ -20,7 +20,9 @@ $required = @(
     'bin\RA3Borderless.exe',
     'bin\RA3EdgeScroll.exe',
     'bin\RA3Ore100K.exe',
-    'bin\RA3SteamOptions.exe'
+    'bin\RA3SteamOptions.exe',
+    'bin\RA3OreSetup.exe',
+    'bin\RA3OreRefill.exe'
 )
 foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $PackageRoot $relative))) {
@@ -31,8 +33,8 @@ foreach ($relative in $required) {
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ("RA3AutoEnhance-InstallTest-" + [Guid]::NewGuid().ToString('N'))
 try {
     & (Join-Path $PackageRoot 'installer\Install-RA3AutoEnhance.ps1') `
-        -InstallRoot $testRoot -SkipTask -NoPrompt -SkipShortcut -SkipSteamOptions -AllowCustomRoot
-    foreach ($name in @('RA3AutoEnhance.exe','RA3Borderless.exe','RA3EdgeScroll.exe','RA3Ore100K.exe','RA3SteamOptions.exe')) {
+        -InstallRoot $testRoot -SkipTask -NoPrompt -SkipShortcut -SkipSteamOptions -SkipOreSetup -AllowCustomRoot
+    foreach ($name in @('RA3AutoEnhance.exe','RA3Borderless.exe','RA3EdgeScroll.exe','RA3Ore100K.exe','RA3SteamOptions.exe','RA3OreSetup.exe','RA3OreRefill.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $testRoot $name))) {
             throw "Installer did not copy $name"
         }
@@ -43,7 +45,7 @@ try {
         }
     }
     & (Join-Path $PackageRoot 'installer\Uninstall-RA3AutoEnhance.ps1') `
-        -InstallRoot $testRoot -SkipTask -NoPrompt -KeepSteamOptions -SkipShortcut -AllowCustomRoot
+        -InstallRoot $testRoot -SkipTask -NoPrompt -KeepSteamOptions -SkipShortcut -SkipOreSetup -AllowCustomRoot
     if (Test-Path -LiteralPath $testRoot) {
         throw "Uninstaller left the staging directory behind: $testRoot"
     }

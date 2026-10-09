@@ -1,12 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'RA3AutoEnhance'),
+    [string]$InstallRoot = (Join-Path $env:USERPROFILE '.local\share\ra3-auto-enhance'),
     [string]$TaskName = 'RA3 Auto Enhance',
     [switch]$SkipTask,
     [switch]$NoPrompt,
     [switch]$RestartSteam,
     [switch]$SkipShortcut,
     [switch]$SkipSteamOptions,
+    [switch]$SkipOreSetup,
     [switch]$AllowCustomRoot
 )
 
@@ -16,7 +17,9 @@ $RequiredExecutables = @(
     'RA3Borderless.exe',
     'RA3EdgeScroll.exe',
     'RA3Ore100K.exe',
-    'RA3SteamOptions.exe'
+    'RA3SteamOptions.exe',
+    'RA3OreSetup.exe',
+    'RA3OreRefill.exe'
 )
 
 function Get-FullPath([string]$Path) {
@@ -28,7 +31,7 @@ function Assert-SafeInstallRoot([string]$Path) {
     if ($full -eq [IO.Path]::GetPathRoot($full)) {
         throw "Refusing to use a drive root as InstallRoot: $full"
     }
-    $defaultRoot = Get-FullPath (Join-Path $env:LOCALAPPDATA 'RA3AutoEnhance')
+    $defaultRoot = Get-FullPath (Join-Path $env:USERPROFILE '.local\share\ra3-auto-enhance')
     if (-not $AllowCustomRoot -and $full -ne $defaultRoot) {
         throw "Custom InstallRoot requires -AllowCustomRoot: $full"
     }
@@ -38,6 +41,11 @@ function Assert-SafeInstallRoot([string]$Path) {
 function Stop-InstalledProcesses([string]$Root) {
     $prefix = $Root.TrimEnd('\') + '\'
     $names = @('RA3AutoEnhance.exe','RA3Borderless.exe','RA3EdgeScroll.exe','RA3Ore100K.exe','RA3SteamOptions.exe')
+    # Stop the supervisor's bootloader and worker first so neither restarts children.
+    $supervisors = @(Get-CimInstance Win32_Process | Where-Object {
+        $_.Name -eq 'RA3AutoEnhance.exe' -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+    })
+    $supervisors | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     Get-CimInstance Win32_Process | Where-Object {
         $_.Name -in $names -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
     } | ForEach-Object {
@@ -95,6 +103,9 @@ if (-not $SkipTask) {
     }
 }
 Stop-InstalledProcesses $InstallRoot
+if (-not $SkipTask) {
+    Stop-InstalledProcesses (Get-FullPath (Join-Path $env:LOCALAPPDATA 'RA3AutoEnhance'))
+}
 
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
 foreach ($name in $RequiredExecutables) {
@@ -114,6 +125,15 @@ $marker = @{
     install_root = $InstallRoot
 } | ConvertTo-Json
 Set-Content -LiteralPath (Join-Path $InstallRoot '.ra3-auto-enhance-install.json') -Value $marker -Encoding utf8
+
+if (-not $SkipOreSetup) {
+    Write-Host 'Preparing the persistent Uprising ore override from your installed game. Keep Uprising closed.'
+    $oreSetup = Start-Process -FilePath (Join-Path $InstallRoot 'RA3OreSetup.exe') -ArgumentList '--install' -WindowStyle Hidden -Wait -PassThru
+    if ($oreSetup.ExitCode -notin @(0, 2)) {
+        throw 'Uprising ore setup failed. Run RA3OreSetup.exe --install in a terminal for the diagnostic. Keep Uprising closed.'
+    }
+    if ($oreSetup.ExitCode -eq 2) { Write-Warning 'Uprising was not found. Run RA3OreSetup.exe --install --game-dir with its installation folder.' }
+}
 
 if (-not $SkipTask) {
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name

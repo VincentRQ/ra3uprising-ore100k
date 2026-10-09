@@ -1,12 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'RA3AutoEnhance'),
+    [string]$InstallRoot = (Join-Path $env:USERPROFILE '.local\share\ra3-auto-enhance'),
     [string]$TaskName = 'RA3 Auto Enhance',
     [switch]$SkipTask,
     [switch]$NoPrompt,
     [switch]$CloseSteam,
     [switch]$KeepSteamOptions,
     [switch]$SkipShortcut,
+    [switch]$SkipOreSetup,
     [switch]$AllowCustomRoot
 )
 
@@ -21,7 +22,7 @@ function Assert-SafeInstallRoot([string]$Path) {
     if ($full -eq [IO.Path]::GetPathRoot($full)) {
         throw "Refusing to remove a drive root: $full"
     }
-    $defaultRoot = Get-FullPath (Join-Path $env:LOCALAPPDATA 'RA3AutoEnhance')
+    $defaultRoot = Get-FullPath (Join-Path $env:USERPROFILE '.local\share\ra3-auto-enhance')
     if (-not $AllowCustomRoot -and $full -ne $defaultRoot) {
         throw "Custom InstallRoot requires -AllowCustomRoot: $full"
     }
@@ -44,6 +45,8 @@ function Wait-ForSteamExit([int]$TimeoutSeconds = 45) {
 $InstallRoot = Assert-SafeInstallRoot $InstallRoot
 Write-Host "Uninstalling RA3 Auto Enhance from $InstallRoot"
 
+
+
 if (-not $SkipTask) {
     Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
@@ -52,11 +55,19 @@ if (-not $SkipTask) {
 $prefix = $InstallRoot.TrimEnd('\') + '\'
 $names = @('RA3AutoEnhance.exe','RA3Borderless.exe','RA3EdgeScroll.exe','RA3Ore100K.exe','RA3SteamOptions.exe')
 Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -eq 'RA3AutoEnhance.exe' -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Get-CimInstance Win32_Process | Where-Object {
     $_.Name -in $names -and $_.ExecutablePath -and $_.ExecutablePath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
 } | ForEach-Object {
     Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
 }
 Start-Sleep -Seconds 1
+
+if (-not $SkipOreSetup) {
+    $oreSetup = Start-Process -FilePath (Join-Path $InstallRoot 'RA3OreSetup.exe') -ArgumentList '--uninstall' -WindowStyle Hidden -Wait -PassThru
+    if ($oreSetup.ExitCode -ne 0) { throw 'Ore unregistration failed. Close Uprising and retry; installed files were retained.' }
+}
 
 if (-not $KeepSteamOptions) {
     $steamRunning = [bool](Get-Process -Name steam -ErrorAction SilentlyContinue)

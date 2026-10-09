@@ -6,6 +6,7 @@ from ctypes import wintypes
 
 from ra3_auto.paths import PROCESS_NAMES_ARGUMENT, log_path
 from ra3_auto.processes import find_first_process
+from ra3_auto.ore_disk import DiskOverride
 
 PROCESS_QUERY_INFORMATION = 0x0400
 PROCESS_VM_READ = 0x0010
@@ -95,38 +96,68 @@ def main():
     patch = struct.pack('<III', 30000, 250, 60)
     newval = struct.pack('<I', 100000)
 
-    log(f"helper started processes={','.join(proc_names)}")
+    log(f"helper v2 started processes={','.join(proc_names)}; retail ore override guard enabled")
+    try:
+        disk = DiskOverride()
+    except FileNotFoundError:
+        disk = None
+    last_guard = None
     active_pid = None
     patched_addresses = []
+    next_scan = 0
     while True:
-        pid, proc_name = find_first_process(proc_names)
+        try:
+            pid, proc_name = find_first_process(proc_names)
+        except OSError as error:
+            log(f'transient process enumeration failure: winerror={error.winerror}; retrying')
+            time.sleep(5)
+            continue
+        if disk:
+            try:
+                guard = disk.ensure(game_running=bool(pid))
+            except (OSError, ValueError, RuntimeError) as error:
+                guard = f'ore override unavailable: {error}'
+            if guard != last_guard:
+                log(guard)
+                last_guard = guard
         if pid != active_pid:
             active_pid = pid
             patched_addresses = []
+            next_scan = 0
             if pid:
                 log(f"found {proc_name} pid={pid}")
+                if disk and proc_name.casefold() == 'ra3ep1_1.1.game':
+                    log('Uprising uses the startup asset override; an already-open engine needs a restart after installation')
+        if proc_name and proc_name.casefold() == 'ra3ep1_1.1.game':
+            # Uprising's retail data is patched before instances are created.
+            # A late memory-template write cannot reliably change existing mines.
+            if not disk and last_guard != 'Uprising override missing; run RA3OreSetup.exe --install':
+                last_guard = 'Uprising override missing; run RA3OreSetup.exe --install'
+                log(last_guard)
+            time.sleep(5)
+            continue
         if pid:
             h = k32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION, False, pid)
             if h:
-                if not patched_addresses:
+                if not patched_addresses or time.monotonic() >= next_scan:
+                    next_scan = time.monotonic() + 10
                     hits = find_pattern(h, patch)
                     for x in hits:
-                        current = read_mem(h, x, 4)
-                        if current and len(current) == 4 and struct.unpack('<I', current)[0] == 30000:
+                        current = read_mem(h, x, len(patch))
+                        if current == patch:
                             if write_mem(h, x, newval):
-                                patched_addresses.append(x)
+                                if x not in patched_addresses:
+                                    patched_addresses.append(x)
                                 log(f"patched 30000->100000 at 0x{x:x}")
                 else:
                     valid_addresses = []
                     for x in patched_addresses:
-                        current = read_mem(h, x, 4)
-                        if not current or len(current) != 4:
+                        current = read_mem(h, x, len(patch))
+                        if current not in (patch, newval + patch[4:]):
                             continue
-                        value = struct.unpack('<I', current)[0]
-                        if value == 30000:
+                        if current == patch:
                             write_mem(h, x, newval)
-                        if value in (30000, 100000):
-                            valid_addresses.append(x)
+                        valid_addresses.append(x)
                     patched_addresses = valid_addresses
                 k32.CloseHandle(h)
         time.sleep(5)

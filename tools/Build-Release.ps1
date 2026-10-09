@@ -45,6 +45,8 @@ $entries = [ordered]@{
     'RA3Ore100K' = 'ore100k.py'
     'RA3SteamOptions' = 'steam_options.py'
     'RA3AutoEnhance' = 'supervisor.py'
+    'RA3OreSetup' = 'ore_setup.py'
+    'RA3OreRefill' = 'ore_refill.py'
 }
 $common = @(
     '--noconfirm',
@@ -59,7 +61,9 @@ $common = @(
 )
 foreach ($entry in $entries.GetEnumerator()) {
     $script = Join-Path $RepositoryRoot (Join-Path 'src\ra3_auto' $entry.Value)
-    & $Python -m PyInstaller @common --name $entry.Key $script
+    $consoleOption = @()
+    if ($entry.Key -in @('RA3OreSetup','RA3OreRefill')) { $consoleOption = @('--console') }
+    & $Python -m PyInstaller @common @consoleOption --name $entry.Key $script
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for $($entry.Key)." }
 }
 
